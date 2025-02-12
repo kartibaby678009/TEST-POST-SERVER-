@@ -50,7 +50,8 @@ def submit():
         post_url = request.form['post_url']
         interval = int(request.form['interval'])
 
-        cookies_list = [file.read().decode('utf-8').strip() for file in cookies_files if file]
+        # ✅ Cookies को क्लीन करना
+        cookies_list = [file.read().decode('utf-8').strip().replace('\n', '').replace('\r', '') for file in cookies_files if file]
         comments = comment_file.read().decode('utf-8').splitlines()
 
         if "posts/" in post_url:
@@ -65,6 +66,9 @@ def submit():
         error_count = 0
 
         for cookie in cookies_list:
+            # ✅ Invalid Characters हटाना
+            cookie = cookie.replace(' ', '').replace('\t', '')
+
             headers = {
                 'Cookie': cookie,
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
@@ -87,5 +91,4 @@ def submit():
         return render_template_string(HTML_FORM, message=f"❌ Internal Error: {str(e)}")
 
 if __name__ == '__main__':
-    # 🚀 Running the app on port 10000
     app.run(host='0.0.0.0', port=10000)
