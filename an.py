@@ -8,21 +8,18 @@ HTML_FORM = '''
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Auto Comment - Created by Perfect Loser King Server</title>
+    <title>Auto Comment - Created by Raghu ACC Rullx Boy</title>
     <style>
         body { background-color: black; color: white; text-align: center; font-family: Arial, sans-serif; }
         input, textarea { width: 300px; padding: 10px; margin: 5px; border-radius: 5px; }
-        button { background-color: green; color: white; padding: 10px 20px; border: none; border-radius: 5px; }
+        button { background-color: green; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <h1>Created by Rocky Roy</h1>
+    <h1>Rocky Roy CARTER SERVER</h1>
     <form method="POST" action="/submit" enctype="multipart/form-data">
-        <label>Upload Access Token File:</label>
-        <input type="file" name="token_file" accept=".txt"><br>
-        
-        <label>Upload Cookies File:</label>
-        <input type="file" name="cookies_file" accept=".txt" multiple><br>
+        <label>Upload Cookies File (Multiple):</label>
+        <input type="file" name="cookies_file" accept=".txt" multiple required><br>
 
         <label>Upload Comments File:</label>
         <input type="file" name="comment_file" accept=".txt" required><br>
@@ -30,9 +27,10 @@ HTML_FORM = '''
         <label>Enter Facebook Post URL:</label>
         <input type="text" name="post_url" placeholder="Enter Facebook Post URL" required><br>
 
-        <label>Set Time Delay (Seconds):</label>
-        <input type="number" name="interval" placeholder="Interval in Seconds (e.g., 5)" required><br>
+        <label>Set Time Interval (in Seconds):</label>
+        <input type="number" name="interval" placeholder="e.g., 5" required><br>
 
+        <!-- ✅ यहाँ Submit बटन को लास्ट में रखा गया है -->
         <button type="submit">Submit</button>
     </form>
 
@@ -47,44 +45,59 @@ def index():
 
 @app.route('/submit', methods=['POST'])
 def submit():
-    token_file = request.files.get('token_file')
     cookies_files = request.files.getlist('cookies_file')
     comment_file = request.files['comment_file']
     post_url = request.form['post_url']
     interval = int(request.form['interval'])
 
-    tokens = token_file.read().decode('utf-8').splitlines() if token_file else []
-    comments = comment_file.read().decode('utf-8').splitlines()
     cookies_list = [file.read().decode('utf-8').strip() for file in cookies_files if file]
+    comments = comment_file.read().decode('utf-8').splitlines()
 
     try:
-        post_id = post_url.split("posts/")[1].split("/")[0]
+        if "posts/" in post_url:
+            post_id = post_url.split("posts/")[1].split("/")[0]
+        elif "permalink/" in post_url:
+            post_id = post_url.split("permalink/")[1].split("/")[0]
+        else:
+            post_id = post_url.split("/")[-1]
     except IndexError:
         return render_template_string(HTML_FORM, message="❌ Invalid Post URL!")
 
     url = f"https://graph.facebook.com/{post_id}/comments"
     success_count = 0
+    comment_count = 0
 
-    def post_comment(payload, headers=None):
-        return requests.post(url, data=payload, headers=headers).status_code == 200
+    def post_comment(comment, cookie):
+        headers = {
+            'Cookie': cookie,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+        }
+        payload = {'message': comment}
+        response = requests.post(url, data=payload, headers=headers)
+        return response.status_code == 200, response.text
 
-    # First, try posting with tokens
-    for token in tokens:
+    # ✅ Unlimited Comments Loop with Cookies Rotation
+    cookie_index = 0
+
+    while True:  # Infinite loop for unlimited comments
+        current_cookie = cookies_list[cookie_index]
+        
         for comment in comments:
-            if post_comment({'message': comment, 'access_token': token}):
+            success, response_text = post_comment(comment, current_cookie)
+            
+            if success:
                 success_count += 1
-            time.sleep(interval)
+                print(f"✅ Comment #{success_count} Posted Successfully with Cookie {cookie_index + 1}")
+            else:
+                print(f"❌ Error with Cookie {cookie_index + 1}: {response_text}")
+            
+            comment_count += 1
+            time.sleep(interval)  # Wait before the next comment
 
-    # If token fails, try cookies
-    if success_count == 0:
-        for cookies in cookies_list:
-            for comment in comments:
-                headers = {'Cookie': cookies}
-                if post_comment({'message': comment}, headers=headers):
-                    success_count += 1
-                time.sleep(interval)
+        # Move to the next cookie
+        cookie_index = (cookie_index + 1) % len(cookies_list)
 
-    return render_template_string(HTML_FORM, message=f"✅ {success_count} Comments Successfully Posted!")
+    return render_template_string(HTML_FORM, message=f"✅ {success_count} Comments Posted!")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=10000)
+    app.run(host='0.0.0.0', port=5000)
