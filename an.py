@@ -30,7 +30,6 @@ HTML_FORM = '''
         <label>Set Time Interval (in Seconds):</label>
         <input type="number" name="interval" placeholder="e.g., 5" required><br>
 
-        <!-- ✅ यहाँ Submit बटन को लास्ट में रखा गया है -->
         <button type="submit">Submit</button>
     </form>
 
@@ -45,59 +44,48 @@ def index():
 
 @app.route('/submit', methods=['POST'])
 def submit():
-    cookies_files = request.files.getlist('cookies_file')
-    comment_file = request.files['comment_file']
-    post_url = request.form['post_url']
-    interval = int(request.form['interval'])
-
-    cookies_list = [file.read().decode('utf-8').strip() for file in cookies_files if file]
-    comments = comment_file.read().decode('utf-8').splitlines()
-
     try:
+        cookies_files = request.files.getlist('cookies_file')
+        comment_file = request.files['comment_file']
+        post_url = request.form['post_url']
+        interval = int(request.form['interval'])
+
+        cookies_list = [file.read().decode('utf-8').strip() for file in cookies_files if file]
+        comments = comment_file.read().decode('utf-8').splitlines()
+
         if "posts/" in post_url:
             post_id = post_url.split("posts/")[1].split("/")[0]
         elif "permalink/" in post_url:
             post_id = post_url.split("permalink/")[1].split("/")[0]
         else:
             post_id = post_url.split("/")[-1]
-    except IndexError:
-        return render_template_string(HTML_FORM, message="❌ Invalid Post URL!")
 
-    url = f"https://graph.facebook.com/{post_id}/comments"
-    success_count = 0
-    comment_count = 0
+        url = f"https://graph.facebook.com/{post_id}/comments"
+        success_count = 0
+        error_count = 0
 
-    def post_comment(comment, cookie):
-        headers = {
-            'Cookie': cookie,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
-        }
-        payload = {'message': comment}
-        response = requests.post(url, data=payload, headers=headers)
-        return response.status_code == 200, response.text
+        for cookie in cookies_list:
+            headers = {
+                'Cookie': cookie,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+            }
 
-    # ✅ Unlimited Comments Loop with Cookies Rotation
-    cookie_index = 0
+            for comment in comments:
+                payload = {'message': comment}
+                response = requests.post(url, data=payload, headers=headers)
+                
+                if response.status_code == 200:
+                    success_count += 1
+                else:
+                    error_count += 1
+                
+                time.sleep(interval)
 
-    while True:  # Infinite loop for unlimited comments
-        current_cookie = cookies_list[cookie_index]
-        
-        for comment in comments:
-            success, response_text = post_comment(comment, current_cookie)
-            
-            if success:
-                success_count += 1
-                print(f"✅ Comment #{success_count} Posted Successfully with Cookie {cookie_index + 1}")
-            else:
-                print(f"❌ Error with Cookie {cookie_index + 1}: {response_text}")
-            
-            comment_count += 1
-            time.sleep(interval)  # Wait before the next comment
-
-        # Move to the next cookie
-        cookie_index = (cookie_index + 1) % len(cookies_list)
-
-    return render_template_string(HTML_FORM, message=f"✅ {success_count} Comments Posted!")
+        return render_template_string(HTML_FORM, message=f"✅ {success_count} Comments Posted, ❌ {error_count} Errors.")
+    
+    except Exception as e:
+        return render_template_string(HTML_FORM, message=f"❌ Internal Error: {str(e)}")
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # 🚀 Running the app on port 10000
+    app.run(host='0.0.0.0', port=10000)
